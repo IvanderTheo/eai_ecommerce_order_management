@@ -33,15 +33,15 @@ public class CustomerController {
         return customer.map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
-reAuthorize("isAuthenticated()")
-    @P
+
+    @PreAuthorize("isAuthenticated()")
     @PostMapping
     public ResponseEntity<Customer> createCustomer(@RequestBody @Valid CustomerRequest request) {
         Customer customer = customerService.createCustomer(request);
         return new ResponseEntity<>(customer, HttpStatus.CREATED);
     }
-reAuthorize("isAuthenticated()")
-    @P
+
+    @PreAuthorize("isAuthenticated()")
     @PutMapping("/{id}")
     public ResponseEntity<Customer> updateCustomer(@PathVariable Long id, @RequestBody @Valid CustomerRequest request) {
         try {
@@ -50,9 +50,9 @@ reAuthorize("isAuthenticated()")
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
-    }PreAuthorize("isAuthenticated()")
-    @
-
+    }
+    
+    @PreAuthorize("isAuthenticated()")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteCustomer(@PathVariable Long id) {
         try {

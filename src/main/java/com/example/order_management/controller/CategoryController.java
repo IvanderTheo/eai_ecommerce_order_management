@@ -33,15 +33,13 @@ public class CategoryController {
         return category.map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
-reAuthorize("isAuthenticated()")
-    @P
+    @PreAuthorize("isAuthenticated()")
     @PostMapping
     public ResponseEntity<Category> createCategory(@RequestBody @Valid CategoryRequest request) {
         Category category = categoryService.createCategory(request);
         return new ResponseEntity<>(category, HttpStatus.CREATED);
     }
-reAuthorize("isAuthenticated()")
-    @P
+    @PreAuthorize("isAuthenticated()")
     @PutMapping("/{id}")
     public ResponseEntity<Category> updateCategory(@PathVariable Long id, @RequestBody @Valid CategoryRequest request) {
         try {
@@ -50,9 +48,10 @@ reAuthorize("isAuthenticated()")
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
-    }PreAuthorize("isAuthenticated()")
-    @
+    }
 
+    
+    @PreAuthorize("isAuthenticated()")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteCategory(@PathVariable Long id) {
         try {

@@ -33,16 +33,16 @@ public class OrderController {
     public ResponseEntity<List<Order>> getAllOrders() {
         return ResponseEntity.ok(orderService.getAllOrders());
     }
-PreAuthorize("isAuthenticated()")
-    @
+
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/{id}")
     public ResponseEntity<Order> getOrderById(@PathVariable Long id) {
         Optional<Order> order = orderService.getOrderById(id);
         return order.map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
-reAuthorize("isAuthenticated()")
-    @P
+
+    @PreAuthorize("isAuthenticated()")
     @PutMapping("/{id}/status")
     public ResponseEntity<Order> updateStatus(@PathVariable Long id, @RequestParam String status) {
         try {
@@ -52,8 +52,8 @@ reAuthorize("isAuthenticated()")
             return ResponseEntity.notFound().build();
         }
     }
-reAuthorize("isAuthenticated()")
-    @P
+
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/{id}/cancel")
     public ResponseEntity<String> cancelOrder(@PathVariable Long id) {
         try {

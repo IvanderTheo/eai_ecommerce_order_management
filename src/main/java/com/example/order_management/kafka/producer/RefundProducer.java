@@ -47,15 +47,19 @@ public class RefundProducer {
             Message<OrderEvent> message = MessageBuilder
                     .withPayload(event)
                     .setHeader(KafkaHeaders.TOPIC, topic)
-                    // Change KafkaHeaders.MESSAGE_KEY to KafkaHeaders.KEY
                     .setHeader(KafkaHeaders.KEY, key) 
                     .build();
             
-            kafkaTemplate.send(message);
-            log.info("Refund message sent successfully to topic: {}", topic);
+            kafkaTemplate.send(message).addCallback(
+                    success -> log.info("Refund message sent successfully to topic: {}, partition: {}, offset: {}", 
+                            topic,
+                            success.getRecordMetadata().partition(),
+                            success.getRecordMetadata().offset()),
+                    failure -> log.error("Failed to send refund message to topic {}: {}", topic, failure.getMessage())
+            );
         } catch (Exception e) {
-            log.error("Error sending refund message to topic {}: {}", topic, e.getMessage());
-            throw new RuntimeException("Failed to send refund message to Kafka", e);
+            log.error("Error sending refund message to topic {}: {}", topic, e.getMessage(), e);
+            // Log error but don't throw - Kafka is optional
         }
     }
 }

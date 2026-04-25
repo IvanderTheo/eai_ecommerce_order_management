@@ -39,11 +39,16 @@ public class OrderProducer {
                     .setHeader(KafkaHeaders.KEY, key)
                     .build();
             
-            kafkaTemplate.send(message);
-            log.info("Message sent successfully to topic: {}", topic);
+            kafkaTemplate.send(message).addCallback(
+                    success -> log.info("Message sent successfully to topic: {}, partition: {}, offset: {}", 
+                            topic, 
+                            success.getRecordMetadata().partition(),
+                            success.getRecordMetadata().offset()),
+                    failure -> log.error("Failed to send message to topic {}: {}", topic, failure.getMessage())
+            );
         } catch (Exception e) {
-            log.error("Error sending message to topic {}: {}", topic, e.getMessage());
-            throw new RuntimeException("Failed to send message to Kafka", e);
+            log.error("Error sending message to topic {}: {}", topic, e.getMessage(), e);
+            // Log error but don't throw - Kafka is optional
         }
     }
 }

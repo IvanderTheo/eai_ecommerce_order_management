@@ -5,9 +5,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.KafkaHeaders;
+import org.springframework.kafka.support.SendResult;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.stereotype.Service;
+import org.springframework.util.concurrent.ListenableFutureCallback;
 
 @Slf4j
 @Service
@@ -50,13 +52,18 @@ public class RefundProducer {
                     .setHeader(KafkaHeaders.KEY, key) 
                     .build();
             
-            kafkaTemplate.send(message).addCallback(
-                    success -> log.info("Refund message sent successfully to topic: {}, partition: {}, offset: {}", 
+            var future = kafkaTemplate.send(message);
+
+            future.whenComplete((result, ex) -> {
+                if (ex == null) {
+                    log.info("Message sent successfully to topic: {}, partition: {}, offset: {}",
                             topic,
-                            success.getRecordMetadata().partition(),
-                            success.getRecordMetadata().offset()),
-                    failure -> log.error("Failed to send refund message to topic {}: {}", topic, failure.getMessage())
-            );
+                            result.getRecordMetadata().partition(),
+                            result.getRecordMetadata().offset());
+                } else {
+                    log.error("Failed to send message to topic {}: {}", topic, ex.getMessage(), ex);
+                }
+            });
         } catch (Exception e) {
             log.error("Error sending refund message to topic {}: {}", topic, e.getMessage(), e);
             // Log error but don't throw - Kafka is optional

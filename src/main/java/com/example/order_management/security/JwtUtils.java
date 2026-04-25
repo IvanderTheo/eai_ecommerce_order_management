@@ -19,7 +19,7 @@ import java.security.Key;
 @Component
 public class JwtUtils {
 
-    @Value("${jwt.secret}")
+    @Value("${app.jwt.secret}")
     private String jwtSecret;
 
     private Key key() {

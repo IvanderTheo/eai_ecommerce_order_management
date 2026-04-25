@@ -36,7 +36,7 @@ public class OrderProducer {
             Message<OrderEvent> message = MessageBuilder
                     .withPayload(event)
                     .setHeader(KafkaHeaders.TOPIC, topic)
-                    .setHeader(KafkaHeaders.MESSAGE_KEY, key)
+                    .setHeader(KafkaHeaders.KEY, key)
                     .build();
             
             kafkaTemplate.send(message);

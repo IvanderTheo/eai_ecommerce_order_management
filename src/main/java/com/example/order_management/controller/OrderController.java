@@ -53,7 +53,6 @@ public class OrderController {
                                              @RequestBody @Valid List<OrderItemRequest> items) {
         Order order = orderService.createOrder(customerId, items);
         
-        // Send Kafka event
         OrderEvent event = OrderEvent.builder()
                 .orderId(order.getId())
                 .customerId(order.getCustomer().getId())

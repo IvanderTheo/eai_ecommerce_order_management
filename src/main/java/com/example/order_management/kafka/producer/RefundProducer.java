@@ -47,7 +47,8 @@ public class RefundProducer {
             Message<OrderEvent> message = MessageBuilder
                     .withPayload(event)
                     .setHeader(KafkaHeaders.TOPIC, topic)
-                    .setHeader(KafkaHeaders.MESSAGE_KEY, key)
+                    // Change KafkaHeaders.MESSAGE_KEY to KafkaHeaders.KEY
+                    .setHeader(KafkaHeaders.KEY, key) 
                     .build();
             
             kafkaTemplate.send(message);

@@ -1,11 +1,12 @@
 package com.example.order_management.controller;
 
 import com.example.order_management.dto.OrderItemRequest;
+import com.example.order_management.dto.OrderResponse;
+import com.example.order_management.dto.OrderItemResponse;
 import com.example.order_management.entity.Order;
 import com.example.order_management.service.OrderService;
 import com.example.order_management.kafka.producer.OrderProducer;
 import com.example.order_management.kafka.event.OrderEvent;
-import io.swagger.v3.oas.annotations.OpenAPIDefinition;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -24,6 +25,7 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/orders")
@@ -40,14 +42,14 @@ public class OrderController {
     @Operation(summary = "Buat pesanan baru", description = "Membuat pesanan baru dan mengirim event ke Kafka")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "Pesanan berhasil dibuat",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = Order.class))),
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = OrderResponse.class))),
             @ApiResponse(responseCode = "400", description = "Data tidak valid"),
             @ApiResponse(responseCode = "401", description = "Tidak terautentikasi"),
             @ApiResponse(responseCode = "404", description = "Customer atau product tidak ditemukan")
     })
     @PreAuthorize("isAuthenticated()")
     @PostMapping
-    public ResponseEntity<Order> createOrder(@Parameter(description = "ID Customer", required = true)
+    public ResponseEntity<OrderResponse> createOrder(@Parameter(description = "ID Customer", required = true)
                                              @RequestParam Long customerId,
                                              @Parameter(description = "Daftar item pesanan", required = true)
                                              @RequestBody @Valid List<OrderItemRequest> items) {
@@ -64,7 +66,7 @@ public class OrderController {
                 .build();
         orderProducer.sendOrderCreatedEvent(event);
         
-        return new ResponseEntity<>(order, HttpStatus.CREATED);
+        return new ResponseEntity<>(convertToDto(order), HttpStatus.CREATED);
     }
 
     @Operation(summary = "Dapatkan semua pesanan", description = "Mengambil daftar semua pesanan")
@@ -74,8 +76,11 @@ public class OrderController {
     })
     @PreAuthorize("isAuthenticated()")
     @GetMapping
-    public ResponseEntity<List<Order>> getAllOrders() {
-        return ResponseEntity.ok(orderService.getAllOrders());
+    public ResponseEntity<List<OrderResponse>> getAllOrders() {
+        List<OrderResponse> orders = orderService.getAllOrders().stream()
+                .map(this::convertToDto)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(orders);
     }
 
     @Operation(summary = "Dapatkan pesanan berdasarkan ID", description = "Mengambil detail pesanan spesifik")
@@ -86,10 +91,10 @@ public class OrderController {
     })
     @PreAuthorize("isAuthenticated()")
     @GetMapping("/{id}")
-    public ResponseEntity<Order> getOrderById(@Parameter(description = "ID Pesanan", required = true)
+    public ResponseEntity<OrderResponse> getOrderById(@Parameter(description = "ID Pesanan", required = true)
                                               @PathVariable Long id) {
         Optional<Order> order = orderService.getOrderById(id);
-        return order.map(ResponseEntity::ok)
+        return order.map(value -> ResponseEntity.ok(convertToDto(value)))
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
@@ -101,14 +106,13 @@ public class OrderController {
     })
     @PreAuthorize("isAuthenticated()")
     @PutMapping("/{id}/status")
-    public ResponseEntity<Order> updateStatus(@Parameter(description = "ID Pesanan", required = true)
+    public ResponseEntity<OrderResponse> updateStatus(@Parameter(description = "ID Pesanan", required = true)
                                               @PathVariable Long id,
                                               @Parameter(description = "Status baru (PENDING, CONFIRMED, SHIPPED, DELIVERED, CANCELLED)", required = true)
                                               @RequestParam String status) {
         try {
             Order order = orderService.updateStatus(id, status);
             
-            // Send Kafka event
             OrderEvent event = OrderEvent.builder()
                     .orderId(order.getId())
                     .customerId(order.getCustomer().getId())
@@ -120,7 +124,7 @@ public class OrderController {
                     .build();
             orderProducer.sendOrderStatusUpdatedEvent(event);
             
-            return ResponseEntity.ok(order);
+            return ResponseEntity.ok(convertToDto(order));
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
@@ -140,7 +144,6 @@ public class OrderController {
         try {
             orderService.cancelOrder(id);
             
-            // Send Kafka event
             OrderEvent event = OrderEvent.builder()
                     .orderId(id)
                     .eventType("ORDER_CANCELLED")
@@ -153,5 +156,23 @@ public class OrderController {
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
+    }
+
+    // Helper Method untuk Mapping
+    private OrderResponse convertToDto(Order order) {
+        return OrderResponse.builder()
+                .id(order.getId())
+                .orderNumber(order.getOrderNumber())
+                .customerName(order.getCustomer().getName())
+                .status(order.getStatus())
+                .totalAmount(order.getTotalAmount())
+                .createdAt(order.getCreatedAt())
+                .items(order.getItems().stream().map(item -> OrderItemResponse.builder()
+                        .productName(item.getProduct().getName())
+                        .quantity(item.getQuantity())
+                        .price(item.getPrice())
+                        .subtotal(item.getSubtotal())
+                        .build()).collect(Collectors.toList()))
+                .build();
     }
 }

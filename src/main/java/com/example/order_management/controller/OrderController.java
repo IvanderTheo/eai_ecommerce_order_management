@@ -22,6 +22,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -49,25 +50,14 @@ public class OrderController {
     })
     @PreAuthorize("isAuthenticated()")
     @PostMapping
-    public ResponseEntity<OrderResponse> createOrder(@Parameter(description = "ID Customer", required = true)
-                                             @RequestParam Long customerId,
-                                             @Parameter(description = "Daftar item pesanan", required = true)
-                                             @RequestBody @Valid List<OrderItemRequest> items) {
+        public ResponseEntity<OrderResponse> createOrder(
+                @RequestParam Long customerId,
+                @RequestBody List<OrderItemRequest> items) {
+
         Order order = orderService.createOrder(customerId, items);
-        
-        OrderEvent event = OrderEvent.builder()
-                .orderId(order.getId())
-                .customerId(order.getCustomer().getId())
-                .status(order.getStatus())
-                .totalAmount(order.getTotalAmount())
-                .eventType("ORDER_CREATED")
-                .timestamp(LocalDateTime.now())
-                .description("Pesanan baru telah dibuat")
-                .build();
-        orderProducer.sendOrderCreatedEvent(event);
-        
+
         return new ResponseEntity<>(convertToDto(order), HttpStatus.CREATED);
-    }
+        }
 
     @Operation(summary = "Dapatkan semua pesanan", description = "Mengambil daftar semua pesanan")
     @ApiResponses(value = {
@@ -106,29 +96,26 @@ public class OrderController {
     })
     @PreAuthorize("isAuthenticated()")
     @PutMapping("/{id}/status")
-    public ResponseEntity<OrderResponse> updateStatus(@Parameter(description = "ID Pesanan", required = true)
-                                              @PathVariable Long id,
-                                              @Parameter(description = "Status baru (PENDING, CONFIRMED, SHIPPED, DELIVERED, CANCELLED)", required = true)
-                                              @RequestParam String status) {
-        try {
-            Order order = orderService.updateStatus(id, status);
-            
-            OrderEvent event = OrderEvent.builder()
-                    .orderId(order.getId())
-                    .customerId(order.getCustomer().getId())
-                    .status(order.getStatus())
-                    .totalAmount(order.getTotalAmount())
-                    .eventType("ORDER_STATUS_UPDATED")
-                    .timestamp(LocalDateTime.now())
-                    .description("Status pesanan diperbarui menjadi: " + status)
-                    .build();
-            orderProducer.sendOrderStatusUpdatedEvent(event);
-            
-            return ResponseEntity.ok(convertToDto(order));
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
-    }
+public ResponseEntity<OrderResponse> updateStatus(
+        @PathVariable Long id,
+        @RequestParam String status) {
+
+    Order order = orderService.updateStatus(id, status);
+
+    OrderEvent event = OrderEvent.builder()
+            .orderId(order.getId())
+            .customerId(order.getCustomerId()) // 🔥 FIX
+            .status(order.getStatus())
+            .totalAmount(order.getTotalAmount())
+            .eventType("ORDER_STATUS_UPDATED")
+            .timestamp(LocalDateTime.now())
+            .description("Status updated")
+            .build();
+
+    orderProducer.sendOrderStatusUpdatedEvent(event);
+
+    return ResponseEntity.ok(convertToDto(order));
+}
 
     @Operation(summary = "Batalkan pesanan", description = "Membatalkan pesanan dan mengirim event ke Kafka")
     @ApiResponses(value = {
@@ -160,19 +147,22 @@ public class OrderController {
 
     // Helper Method untuk Mapping
     private OrderResponse convertToDto(Order order) {
-        return OrderResponse.builder()
-                .id(order.getId())
-                .orderNumber(order.getOrderNumber())
-                .customerName(order.getCustomer().getName())
-                .status(order.getStatus())
-                .totalAmount(order.getTotalAmount())
-                .createdAt(order.getCreatedAt())
-                .items(order.getItems().stream().map(item -> OrderItemResponse.builder()
-                        .productName(item.getProduct().getName())
-                        .quantity(item.getQuantity())
-                        .price(item.getPrice())
-                        .subtotal(item.getSubtotal())
-                        .build()).collect(Collectors.toList()))
-                .build();
-    }
+
+    return OrderResponse.builder()
+            .id(order.getId())
+            .orderNumber(order.getOrderNumber())
+            .customerId(order.getCustomerId()) // 🔥 FIX
+            .status(order.getStatus())
+            .totalAmount(order.getTotalAmount())
+            .createdAt(order.getCreatedAt())
+            .items(order.getItems().stream().map(item ->
+                    OrderItemResponse.builder()
+                            .productId(item.getProductId())
+                            .quantity(item.getQuantity())
+                            .price(item.getPrice())
+                            .subtotal(item.getSubtotal())
+                            .build()
+            ).collect(Collectors.toList()))
+            .build();
+        }
 }

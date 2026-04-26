@@ -1,13 +1,13 @@
 package com.example.order_management.service;
 
+import com.example.order_management.client.user.UserResponse;
+import com.example.order_management.client.user.UserServiceClient;
+import com.example.order_management.client.product.ProductResponse;
+import com.example.order_management.client.product.ProductServiceClient;
 import com.example.order_management.dto.OrderItemRequest;
-import com.example.order_management.entity.Customer;
 import com.example.order_management.entity.Order;
 import com.example.order_management.entity.OrderItem;
-import com.example.order_management.entity.Product;
-import com.example.order_management.repository.CustomerRepository;
 import com.example.order_management.repository.OrderRepository;
-import com.example.order_management.repository.ProductRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,46 +23,50 @@ public class OrderService {
     private OrderRepository orderRepository;
 
     @Autowired
-    private CustomerRepository customerRepository;
+    private UserServiceClient userServiceClient;
 
     @Autowired
-    private ProductRepository productRepository;
+    private ProductServiceClient productServiceClient;
 
-    @Transactional
-    public Order createOrder(Long customerId, List<OrderItemRequest> itemRequests) {
-        Customer customer = customerRepository.findById(customerId)
-                .orElseThrow(() -> new RuntimeException("Customer tidak ditemukan"));
+    public Order createOrder(Long customerId, List<OrderItemRequest> items) {
+
+        // 🔥 VALIDATE USER
+        UserResponse user = userServiceClient.getUserById(customerId);
+
+        if (user == null) {
+            throw new RuntimeException("Customer tidak ditemukan");
+        }
 
         Order order = new Order();
-        order.setCustomer(customer);
-        order.setOrderNumber("ORD-" + System.currentTimeMillis());
+        order.setOrderNumber(generateOrderNumber());
+        order.setCustomerId(customerId);
+        order.setCustomerNameSnapshot(user.getUsername());
         order.setStatus("PENDING");
         order.setCreatedAt(LocalDateTime.now());
 
-        double total = 0.0;
+        double total = 0;
 
-        for (OrderItemRequest req : itemRequests) {
-            Product product = productRepository.findById(req.getProductId())
-                    .orElseThrow(() -> new RuntimeException("Product tidak ditemukan"));
+        // 🔥 LOOP ITEMS (MICROSERVICE CORRECT WAY)
+        for (OrderItemRequest req : items) {
 
-            if (product.getStock() < req.getQuantity()) {
-                throw new RuntimeException("Stok produk tidak cukup: " + product.getName());
+            ProductResponse product = productServiceClient.getProductById(req.getProductId());
+
+            if (product == null) {
+                throw new RuntimeException("Product tidak ditemukan: " + req.getProductId());
             }
 
-            product.setStock(product.getStock() - req.getQuantity());
-            productRepository.save(product);
-
             OrderItem item = new OrderItem();
-            item.setProduct(product);
+            item.setProductId(req.getProductId()); // ✔ FIXED
             item.setQuantity(req.getQuantity());
-            item.setPrice(product.getPrice());
+            item.setPrice(product.getPrice()); // ambil dari product-service
             item.setSubtotal(product.getPrice() * req.getQuantity());
-            order.addItem(item);
 
             total += item.getSubtotal();
+            order.addItem(item);
         }
 
         order.setTotalAmount(total);
+
         return orderRepository.save(order);
     }
 
@@ -83,23 +87,19 @@ public class OrderService {
                 .orElseThrow(() -> new RuntimeException("Order tidak ditemukan"));
     }
 
-    @Transactional
     public void cancelOrder(Long orderId) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new RuntimeException("Order tidak ditemukan"));
 
         if ("CANCELLED".equals(order.getStatus()) || "SHIPPED".equals(order.getStatus())) {
-            throw new RuntimeException("Order tidak dapat dibatalkan dengan status: " + order.getStatus());
-        }
-
-        // Return stok produk ke stock sebelumnya
-        for (OrderItem item : order.getItems()) {
-            Product product = item.getProduct();
-            product.setStock(product.getStock() + item.getQuantity());
-            productRepository.save(product);
+            throw new RuntimeException("Order tidak dapat dibatalkan");
         }
 
         order.setStatus("CANCELLED");
         orderRepository.save(order);
+    }
+
+    private String generateOrderNumber() {
+        return "ORD-" + System.currentTimeMillis();
     }
 }

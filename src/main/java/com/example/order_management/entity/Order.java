@@ -13,27 +13,20 @@ public class Order {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
     private String orderNumber;
 
-    @ManyToOne
-    @JoinColumn(name = "customer_id", nullable = false)
-    private Customer customer;
+    private Long customerId;
 
-    @Column(nullable = false)
+    private String customerNameSnapshot;
+
     private String status;
 
-    @Column(nullable = false)
     private Double totalAmount;
 
-    @Column(nullable = false)
     private LocalDateTime createdAt;
 
-    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL)
     private List<OrderItem> items = new ArrayList<>();
-
-    public Order() {
-    }
 
     public void addItem(OrderItem item) {
         items.add(item);
@@ -54,14 +47,6 @@ public class Order {
 
     public void setOrderNumber(String orderNumber) {
         this.orderNumber = orderNumber;
-    }
-
-    public Customer getCustomer() {
-        return customer;
-    }
-
-    public void setCustomer(Customer customer) {
-        this.customer = customer;
     }
 
     public String getStatus() {
@@ -94,5 +79,19 @@ public class Order {
 
     public void setItems(List<OrderItem> items) {
         this.items = items;
+    }
+
+    public Long getCustomerId() {
+        return this.customerId;
+    }
+    public void setCustomerId(Long customerId) {
+        this.customerId=customerId;
+    }
+
+    public String getCustomerNameSnapshot() {
+        return this.customerNameSnapshot;
+    }
+    public void setCustomerNameSnapshot(String customerNameSnapshot) {
+        this.customerNameSnapshot=customerNameSnapshot;
     }
 }

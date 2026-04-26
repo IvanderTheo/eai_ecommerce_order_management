@@ -55,6 +55,13 @@
             <artifactId>spring-kafka</artifactId>
         </dependency>
 
+        <!-- FEIGN CLIENT FOR MICROSERVICES -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-openfeign</artifactId>
+            <version>4.1.0</version>
+        </dependency>
+
         <!-- OPENAPI -->
         <dependency>
             <groupId>org.springdoc</groupId>

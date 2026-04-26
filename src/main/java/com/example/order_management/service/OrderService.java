@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -39,87 +40,49 @@ public class OrderService {
      */
     @Transactional
     public Order createOrder(Long customerId, List<OrderItemRequest> items) {
-        log.info("Creating order for customer: {} with {} items", customerId, items.size());
+        log.info("Creating order for customer: {}", customerId);
 
-        // ✅ VALIDATE CUSTOMER dari User Management
-        UserResponse user = null;
-        try {
-            user = userServiceClient.getUserById(customerId);
-            if (user == null) {
-                throw new RuntimeException("Customer tidak ditemukan dengan ID: " + customerId);
-            }
-            log.info("Customer validated: {}", user.getUsername());
-        } catch (Exception e) {
-            log.error("Error validating customer: {}", e.getMessage());
-            throw new RuntimeException("Gagal validasi customer: " + e.getMessage(), e);
-        }
+        // 1. Validasi Customer
+        UserResponse user = userServiceClient.getUserById(customerId);
+        if (user == null) throw new RuntimeException("Customer not found");
 
         Order order = new Order();
-        order.setOrderNumber(generateOrderNumber());
+        order.setOrderNumber("ORD-" + System.currentTimeMillis());
         order.setCustomerId(customerId);
         order.setCustomerNameSnapshot(user.getUsername());
         order.setStatus("PENDING");
         order.setCreatedAt(LocalDateTime.now());
+        
+        // Inisialisasi list items agar tidak NullPointerException
+        order.setItems(new ArrayList<>()); 
 
         double total = 0;
 
-        // ✅ VALIDATE SETIAP ITEM dari Inventory Management
         for (OrderItemRequest req : items) {
-            log.debug("Validating product {} with quantity {}", req.getProductId(), req.getQuantity());
-
-            // Get product info
-            ProductResponse product = null;
-            try {
-                product = productServiceClient.getProductById(req.getProductId());
-                if (product == null) {
-                    throw new RuntimeException("Product tidak ditemukan: " + req.getProductId());
-                }
-            } catch (Exception e) {
-                log.error("Error getting product: {}", e.getMessage());
-                throw new RuntimeException("Gagal mendapatkan data product: " + e.getMessage(), e);
+            // 2. Cek Stock dulu sebelum ambil detail produk (Hemat Resource)
+            Boolean hasStock = inventoryServiceClient.checkSufficientStock(req.getProductId(), req.getQuantity());
+            if (Boolean.FALSE.equals(hasStock)) {
+                throw new RuntimeException("Stok tidak cukup untuk produk ID: " + req.getProductId());
             }
 
-            // ✅ CHECK STOCK DARI INVENTORY MANAGEMENT
-            try {
-                Boolean hasSufficientStock = inventoryServiceClient.checkSufficientStock(
-                        req.getProductId(),
-                        req.getQuantity()
-                );
-                
-                if (!hasSufficientStock) {
-                    log.warn("Insufficient stock for product {}: required {}", 
-                            req.getProductId(), req.getQuantity());
-                    throw new RuntimeException(
-                            "Stok tidak cukup untuk product " + req.getProductId() +
-                            ". Dibutuhkan: " + req.getQuantity()
-                    );
-                }
-                log.info("Stock validated for product {}", req.getProductId());
-            } catch (Exception e) {
-                log.error("Error checking stock: {}", e.getMessage());
-                throw new RuntimeException("Gagal validasi stok: " + e.getMessage(), e);
-            }
-
-            // Create OrderItem
+            // 3. Ambil Detail Produk
+            ProductResponse product = productServiceClient.getProductById(req.getProductId());
+            
             OrderItem item = new OrderItem();
             item.setProductId(req.getProductId());
+            item.setProductNameSnapshot(product.getName()); // Simpan nama saat ini
             item.setQuantity(req.getQuantity());
-            item.setPrice(Double.valueOf(product.getPrice())); // ambil dari product-service
+            item.setPrice(product.getPrice());
             item.setSubtotal(product.getPrice() * req.getQuantity());
-
-            total += item.getSubtotal();
-            order.addItem(item);
             
-            log.debug("Item added: product {}, quantity {}, price {}", 
-                    req.getProductId(), req.getQuantity(), product.getPrice());
+            total += item.getSubtotal();
+            
+            // Menggunakan helper method untuk set order_id secara otomatis
+            order.addItem(item); 
         }
 
         order.setTotalAmount(total);
-
-        Order savedOrder = orderRepository.save(order);
-        log.info("Order created successfully: {} with total: {}", savedOrder.getId(), total);
-        
-        return savedOrder;
+        return orderRepository.save(order);
     }
 
     public List<Order> getAllOrders() {

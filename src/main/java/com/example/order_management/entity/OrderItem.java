@@ -1,5 +1,7 @@
 package com.example.order_management.entity;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
+
 import jakarta.persistence.*;
 
 @Entity
@@ -20,8 +22,9 @@ public class OrderItem {
 
     private Double subtotal;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY) // Gunakan LAZY untuk performa
     @JoinColumn(name = "order_id")
+    @JsonBackReference // Penting agar tidak terjadi infinite loop saat return JSON
     private Order order;
 
     public Long getId() {
@@ -63,4 +66,8 @@ public class OrderItem {
     public void setSubtotal(Double subtotal) {
         this.subtotal = subtotal;
     }
+    public void setProductId(Long productId) { this.productId = productId; }
+    public Long getProductId() { return productId; }
+    public void setProductNameSnapshot(String productNameSnapshot) { this.productNameSnapshot = productNameSnapshot; }
+    public String getProductNameSnapshot() { return productNameSnapshot; }
 }

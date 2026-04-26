@@ -70,7 +70,7 @@ public class RefundService {
         // Create refund record
         Refund refund = Refund.builder()
                 .orderId(request.getOrderId())
-                .customerId(order.getCustomerNameSnapshot().getId())
+                .customerId(order.getCustomerId())
                 .originalAmount(order.getTotalAmount())
                 .refundAmount(request.getRefundAmount())
                 .status(Refund.RefundStatus.INITIATED)

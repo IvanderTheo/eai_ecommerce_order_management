@@ -10,7 +10,7 @@ import java.util.List;
  * Feign client untuk mengakses Inventory Management Service
  * Base URL: http://localhost:8086
  */
-@FeignClient(name = "inventory-service", url = "http://localhost:8086")
+@FeignClient(name = "inventory-service", contextId = "stock",url = "http://localhost:8086")
 public interface InventoryServiceClient {
     
     /**
